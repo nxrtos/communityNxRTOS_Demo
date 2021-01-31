@@ -8,6 +8,9 @@
 
 #ifndef  ARCH4RTOS_SVC_H        ///{{{
 #define  ARCH4RTOS_SVC_H        ///{{{
+#if   0
+#include  "arch4rtos_svc.txt.h"
+#endif
 
 #include  "arch4rtos.h"
 

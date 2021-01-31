@@ -1,6 +1,6 @@
 /*
  *
- * 1 tab == 4 spaces!
+ * 1 tab == 2 spaces!
  */
 
 /*

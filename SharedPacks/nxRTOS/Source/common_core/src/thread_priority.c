@@ -64,12 +64,12 @@
  *
  *---------------------------------------------------------------------------*/
 #include  "thread_priority.h"
-#include  "list_jcb.h"
-#include  "list_tcb.h"
+#include  "rtos_jcb_ready_list.h"
+#include  "rtos_tcb_live_list.h"
 #include  "arch4rtos_criticallevel.h"
 #include  "nxRTOSConfig.h"
 
-//TCB_t * pxCurrentTCB = NULL;
+//TCB_t * getCurrentTCB() = NULL;
 // {{{ Thread_Priority on currentThreadContext  {{{
 UBaseType_t xGetThreadContextPriority(void)
 {
@@ -78,7 +78,7 @@ UBaseType_t xGetThreadContextPriority(void)
 
     // {{{ raise SysCriticalLevel to RTOS_SYSCRITICALLEVEL {{{
     arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
-    currentPriority = pxCurrentTCB->uxPriority;
+    currentPriority = getCurrentTCB()->uxPriority;
     // }}} restore SysCriticalLevel to original }}}
     arch4rtos_iDropSysCriticalLevel(origSysCriticalLevel);
 
@@ -104,57 +104,57 @@ UBaseType_t xSetThreadContextPriority(UBaseType_t  newLevel)
     arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
 
 
-    if(pxCurrentTCB != NULL)
+    if(getCurrentTCB() != NULL)
     {
-        currentPriority = pxCurrentTCB->uxPriority;
-        pxCurrentTCB->uxPriority = newLevel;
+        currentPriority = getCurrentTCB()->uxPriority;
+        getCurrentTCB()->uxPriority = newLevel;
     }
 
     if(newLevel > currentPriority)
     {   // when try to lower priority, it need to check more for restriction
         // and may need to invoke reschedule.
-        if(pxCurrentTCB->pxJCB != NULL)
+        if(getCurrentTCB()->pxJCB != NULL)
         {   // more check with JCB to see if allowed to newLevel
-            if (pxCurrentTCB->pxJCB->pThreadStack == ThreadStackTempStacking)
+            if (getCurrentTCB()->pxJCB->pThreadStack == ThreadStackTempStacking)
             {
-                if(((BaseTCB_t *)pxCurrentTCB->xStateListItem.prev)->uxPriority
+                if(((LiveTCB_t *)getCurrentTCB()->xTcbListItem.prev)->uxPriority
                                                                                                             < newLevel)
                 {
-                    pxCurrentTCB->uxPriority =
-                       ((BaseTCB_t *)pxCurrentTCB->xStateListItem.prev)->uxPriority;
+                    getCurrentTCB()->uxPriority =
+                       ((LiveTCB_t *)getCurrentTCB()->xTcbListItem.prev)->uxPriority;
                 }
             }
         }
 
-        //  check and update pxRun2TermTCBList_Head or
-        //  pxRun2BlckTCBList_Head
-        if(pxRun2BlckTCBList_Head == pxCurrentTCB)
-        {   // need to check and update pxRun2BlckTCBList_Head
-            pickTCBFromRun2BlckTCBList(pxCurrentTCB);
-            addTCBToRun2BlckTCBList(pxCurrentTCB);
-            if(pxRun2BlckTCBList_Head != pxCurrentTCB)
-            {// after update, if the new pxRun2BlckTCBList_Head changed,
+        //  check and update getCurrentRun2TermTCB() or
+        //  getCurrentRun2BlkTCB()
+        if(getCurrentRun2BlkTCB() == getCurrentTCB())
+        {   // need to check and update getCurrentRun2BlkTCB()
+            removeTCBFromRun2BlckTCBList(getCurrentTCB());
+            insertTCBToRun2BlckTCBList(getCurrentTCB());
+            if(getCurrentRun2BlkTCB() != getCurrentTCB())
+            {// after update, if the new getCurrentRun2BlkTCB() changed,
                 arch4rtosReqSchedulerService();
             }
         }
-        else if (pxRun2TermTCBList_Head == pxCurrentTCB)
+        else if (getCurrentRun2TermTCB() == getCurrentTCB())
         {   // need to restrict check for the setting to lower priority
-            //pxRun2TermTCBList_Head = (TCB_t *) pxRun2TermTCBList_Head->xStateListItem.prev;
-            BaseTCB_t * thePrevTCB = (BaseTCB_t *)pxCurrentTCB->xStateListItem.prev;
-            if((thePrevTCB != NULL) && (thePrevTCB->uxPriority < pxCurrentTCB->uxPriority))
+            //getCurrentRun2TermTCB() = (TCB_t *) getCurrentRun2TermTCB()->xTcbListItem.prev;
+            LiveTCB_t * thePrevTCB = (LiveTCB_t *)getCurrentTCB()->xTcbListItem.prev;
+            if((thePrevTCB != NULL) && (thePrevTCB->uxPriority < getCurrentTCB()->uxPriority))
             {   // reach the limit and have to adjust
-                pxCurrentTCB->uxPriority = thePrevTCB->uxPriority;
+                getCurrentTCB()->uxPriority = thePrevTCB->uxPriority;
             }
-            if ((pxRun2BlckTCBList_Head != NULL) &&
-                    (pxRun2BlckTCBList_Head->uxPriority < pxCurrentTCB->uxPriority))
-            {   // the new pxRun2TermTCBList_Head has lower priority
-                //  than pxRun2BlckTCBList_Head.  reschedule needed.
+            if ((getCurrentRun2BlkTCB() != NULL) &&
+                    (getCurrentRun2BlkTCB()->uxPriority < getCurrentTCB()->uxPriority))
+            {   // the new getCurrentRun2TermTCB() has lower priority
+                //  than getCurrentRun2BlkTCB().  reschedule needed.
                 arch4rtosReqSchedulerService();
             }
         }
         else
-        {   // if the pxCurrentTCB is neither the pxRun2TermTCBList_Head nor
-            //  pxRun2BlckTCBList_Head, reschedule needed.
+        {   // if the getCurrentTCB() is neither the getCurrentRun2TermTCB() nor
+            //  getCurrentRun2BlkTCB(), reschedule needed.
             //  but this could be omitted as this situation is NOT caused by
             //  the new priority setting.
             arch4rtosReqSchedulerService();
@@ -164,7 +164,7 @@ UBaseType_t xSetThreadContextPriority(UBaseType_t  newLevel)
     {
         // raise or same priority, no thing to do further
     }
-    currentPriority = pxCurrentTCB->uxPriority;
+    currentPriority = getCurrentTCB()->uxPriority;
     arch4rtos_iDropSysCriticalLevel(origSysCriticalLevel);
     // }}} restore SysCriticalLevel to original }}}
 
@@ -218,7 +218,7 @@ UBaseType_t xDropThreadContextPriority(UBaseType_t  newLevel)
     // change Thread_Priority to blocked/suspended liveThread has no impact to
     //  RTOS to scheduling.
 
-UBaseType_t xGetLiveThreadPriority(BaseTCB_t * pLiveThread)
+UBaseType_t xGetLiveThreadPriority(LiveTCB_t * pLiveThread)
 {
     UBaseType_t thePriority = RTOS_LOWEST_THREAD_PRIORITY;
     SysCriticalLevel_t origSysCriticalLevel = arch4rtos_iGetSysCriticalLevel();
@@ -228,7 +228,7 @@ UBaseType_t xGetLiveThreadPriority(BaseTCB_t * pLiveThread)
 
     if(pLiveThread == NULL)
     {
-        pLiveThread = pxCurrentTCB;
+        pLiveThread = getCurrentTCB();
     }
 
     if(pLiveThread != NULL)
@@ -241,9 +241,9 @@ UBaseType_t xGetLiveThreadPriority(BaseTCB_t * pLiveThread)
     return thePriority;
 }
 
-UBaseType_t xSetLiveThreadPriority(BaseTCB_t * pLiveThread, UBaseType_t newLevel)
+UBaseType_t xSetLiveThreadPriority(LiveTCB_t * pLiveThread, UBaseType_t newLevel)
 {
-    BaseTCB_t * pxSelectToRunTCB;
+    LiveTCB_t * pxSelectToRunTCB;
     UBaseType_t thePriority =RTOS_LOWEST_THREAD_PRIORITY ;
     SysCriticalLevel_t origSysCriticalLevel = arch4rtos_iGetSysCriticalLevel();
 
@@ -261,7 +261,7 @@ UBaseType_t xSetLiveThreadPriority(BaseTCB_t * pLiveThread, UBaseType_t newLevel
     arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
     if(pLiveThread == NULL)
     {
-        pLiveThread = pxCurrentTCB;
+        pLiveThread = getCurrentTCB();
     }
 
     if(pLiveThread != NULL)
@@ -271,41 +271,41 @@ UBaseType_t xSetLiveThreadPriority(BaseTCB_t * pLiveThread, UBaseType_t newLevel
         pLiveThread->uxPriority = newLevel;
         // now need restriction check and fix for some situation
         if ((pLiveThread->pxJCB->pThreadStack == ThreadStackTempStacking) &&
-                (pLiveThread->xStateListItem.prev != NULL))
+                (pLiveThread->xTcbListItem.prev != NULL))
         {
-            if(((BaseTCB_t *)pLiveThread->xStateListItem.prev)->uxPriority < newLevel)
+            if(((LiveTCB_t *)pLiveThread->xTcbListItem.prev)->uxPriority < newLevel)
             {
                 pLiveThread->uxPriority =
                                 // adjust uxPriority to be same as the one it preempted
-                               ((BaseTCB_t *)pLiveThread->xStateListItem.prev)->uxPriority;
+                               ((LiveTCB_t *)pLiveThread->xTcbListItem.prev)->uxPriority;
             }
         }
 
         // calculate pxSelectToRunTCB
-        pxSelectToRunTCB = pxRun2TermTCBList_Head;
-        if(pxRun2TermTCBList_Head ==  NULL)
+        pxSelectToRunTCB = getCurrentRun2TermTCB();
+        if(getCurrentRun2TermTCB() ==  NULL)
         {
-            pxSelectToRunTCB = pxRun2BlckTCBList_Head;
+            pxSelectToRunTCB = getCurrentRun2BlkTCB();
         }
-        else if(pxRun2BlckTCBList_Head != NULL)
-        {   // neither pxRun2BlckTCBList_Head or pxRun2TermTCBList_Head be NULL
-            if(pxRun2TermTCBList_Head->uxPriority > pxRun2BlckTCBList_Head->uxPriority)
+        else if(getCurrentRun2BlkTCB() != NULL)
+        {   // neither getCurrentRun2BlkTCB() or getCurrentRun2TermTCB() be NULL
+            if(getCurrentRun2TermTCB()->uxPriority > getCurrentRun2BlkTCB()->uxPriority)
             {
-                pxSelectToRunTCB = pxRun2BlckTCBList_Head;
+                pxSelectToRunTCB = getCurrentRun2BlkTCB();
             }
         }
 
         //
-        if(pLiveThread == pxCurrentTCB)
+        if(pLiveThread == getCurrentTCB())
         {   //
             if ((pxSelectToRunTCB != NULL)  &&
-                    (pxSelectToRunTCB->uxPriority < pxCurrentTCB->uxPriority))
+                    (pxSelectToRunTCB->uxPriority < getCurrentTCB()->uxPriority))
             {
                 arch4rtosReqSchedulerService();
             }
 
-            if((pxReadyListJCB != NULL )  &&
-                    (pxReadyListJCB->uxPriority < pxCurrentTCB->uxPriority))
+            if((getReadyJCB() != NULL )  &&
+                    (getReadyJCB()->uxPriority < getCurrentTCB()->uxPriority))
             {
                 arch4rtosReqSchedulerService();
             }
@@ -318,7 +318,7 @@ UBaseType_t xSetLiveThreadPriority(BaseTCB_t * pLiveThread, UBaseType_t newLevel
     return thePriority;
 }
 
-UBaseType_t xRaiseLiveThreadPriority(BaseTCB_t * pLiveThread, UBaseType_t newLevel)
+UBaseType_t xRaiseLiveThreadPriority(LiveTCB_t * pLiveThread, UBaseType_t newLevel)
 {
     UBaseType_t thePriority =RTOS_LOWEST_THREAD_PRIORITY ;
     SysCriticalLevel_t origSysCriticalLevel = arch4rtos_iGetSysCriticalLevel();
@@ -337,7 +337,7 @@ UBaseType_t xRaiseLiveThreadPriority(BaseTCB_t * pLiveThread, UBaseType_t newLev
     arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
     if(pLiveThread == NULL)
     {
-        pLiveThread = pxCurrentTCB;
+        pLiveThread = getCurrentTCB();
     }
 
     if(pLiveThread != NULL)
@@ -358,7 +358,7 @@ UBaseType_t xRaiseLiveThreadPriority(BaseTCB_t * pLiveThread, UBaseType_t newLev
     return  thePriority;
 }
 
-UBaseType_t xDropLiveThreadPriority(BaseTCB_t * pLiveThread, UBaseType_t newLevel)
+UBaseType_t xDropLiveThreadPriority(LiveTCB_t * pLiveThread, UBaseType_t newLevel)
 {
     UBaseType_t thePriority =RTOS_LOWEST_THREAD_PRIORITY ;
     SysCriticalLevel_t origSysCriticalLevel = arch4rtos_iGetSysCriticalLevel();
@@ -377,7 +377,7 @@ UBaseType_t xDropLiveThreadPriority(BaseTCB_t * pLiveThread, UBaseType_t newLeve
     arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
     if(pLiveThread == NULL)
     {
-        pLiveThread = pxCurrentTCB;
+        pLiveThread = getCurrentTCB();
     }
 
     if(pLiveThread != NULL)

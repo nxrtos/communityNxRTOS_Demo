@@ -59,17 +59,8 @@ __STATIC_FORCEINLINE    void  arch4rtosReqSchedulerService()
     SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
 }
 
-__STATIC_FORCEINLINE    void  arch4rtos_thread_termination(void * theTCB)
-{
-  (void) theTCB;  // expect in R0
-  //__asm volatile("    \n");
-  __asm volatile
-  (
-    "  svc    #0xFF   \n"  // SVC_FF_handler()
-  );
-  __DSB();
-  __ISB();
-  while(1);
-}
+//__STATIC_FORCEINLINE
+extern
+void  arch4rtos_thread_termination(void * theTCB);
 
 #endif /* ARCH4RTOS_H */

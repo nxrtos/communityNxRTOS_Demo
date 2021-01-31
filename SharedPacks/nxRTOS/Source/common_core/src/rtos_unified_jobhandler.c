@@ -1,37 +1,22 @@
 /* rtos_unified_jobhandler.c
  * nxRTOS Kernel V0.0.1
- * Copyright (C) 2019  or its affiliates.  All Rights Reserved.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
+ * Copyright (C) 2019  nxrtos or its affiliates.  All Rights Reserved.
+ * *
  * 1 tab == 4 spaces!
  */
 
 #include  "rtos_unified_jobhandler.h"
 #include  "rtos_mutex.h"
 #include  "rtos_jcb.h"
-#include  "list_jcb.h"
-#include  "list_tcb.h"
+#include  "rtos_jcb_free_list.h"
+#include  "rtos_jcb_ready_list.h"
+#include  "rtos_tcb_live_list.h"
 
 int unified_Job_Handler(void * par)
 {
   int	ret = -1;
   JCB_t * theJCB = (JCB_t *)par;
+  LiveTCB_t * theLiveTCB = getCurrentTCB();
   SysCriticalLevel_t criticalLevel = arch4rtos_iGetSysCriticalLevel();
 
   { // sanity check
@@ -94,9 +79,9 @@ int unified_Job_Handler(void * par)
     }
   }
 
-  if(pxCurrentTCB->pxOwnedObjList != NULL)
+  if(theLiveTCB->pxMutexHeld != NULL)
   { // the currentTCB has owned Mutex
-    cleanAllMutexFromHoldingList((void *)pxCurrentTCB);
+    cleanAllMutexFromHoldingList((void *)theLiveTCB);
   }
 
   { // sanity check
@@ -112,7 +97,7 @@ int unified_Job_Handler(void * par)
   }
 
   // the JCB mostly gone at this point, do not refer it any more
-  arch4rtos_thread_termination(pxCurrentTCB);
+  arch4rtos_thread_termination(theLiveTCB);
   // no return
   return ret;
 }

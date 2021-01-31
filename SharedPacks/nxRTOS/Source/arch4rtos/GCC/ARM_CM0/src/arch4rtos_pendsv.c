@@ -54,6 +54,9 @@ void PendSV_Handler(void)	 __attribute__ (( naked ));
 
 void PendSV_Handler(void)
 {
+
+  // TODO , debug trace hard fault, enable before exit
+  __disable_irq();
   // any to do with R0 to R3 as they had pushed into sys stack
   __asm volatile
   ( //  assume Thread mode with PSP, in case of MSP fix it later.
@@ -165,7 +168,7 @@ void PendSV_Handler(void)
 
   __asm volatile
   ( //
-    "   ldr     r3, pxCurrentTCBConst           \n"
+    "   ldr     r3, pxCurrentLiveTCBConst           \n"
     /* Get the location of the current TCB. */
     "   ldr     r2, [r3]                        \n"
     /* now r2 have the pointer to current TCB */
@@ -250,6 +253,6 @@ void PendSV_Handler(void)
     (   // regular return;
         "   bx  LR                      \n"
         "   .align 4                    \n"
-        "pxCurrentTCBConst: .word pxCurrentTCB      \n"
+        "pxCurrentLiveTCBConst: .word pxCurrentLiveTCB      \n"
     );
 }

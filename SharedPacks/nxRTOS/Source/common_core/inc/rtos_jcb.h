@@ -17,7 +17,7 @@
 #endif
 
 #include  "arch4rtos.h"
-#include  "rtos_xcb_base.h"
+#include  "rtos_tcb_base.h"
 #include  "list.h"
 
 typedef  enum   jcb_act_option_enum
@@ -66,59 +66,61 @@ typedef  struct  job_control_t *  JobHandle_t;
 
 typedef  struct  job_control_t
 {
-    Xcb_Base_Items;
-/// {{{ items replaced in Xcb_Base_Items, switch for debug {{{
-//    StackType_t *   pThreadStack;
-                                  /* the pointer to RAM block will be used for
-                                   * the thread's stack space. The value can be
-                                   * real pointer if pre-allocated RAM or
-                                   * global/static RAM provided.
-                                   * Or predefined special meaning, defined in
-                                   * StackTypeEnum_t */
-
-//    ListJCBItem_t   xJcbListItem;
+  Tcb_Base_Items;
+//  {{{ items replaced in Tcb_Base_Items, switch for debug {{{
+//  StackType_t *   pThreadStack;
+                    /* the pointer to RAM block will be used for
+                     * the thread's stack space. The value can be
+                     * real pointer if pre-allocated RAM or
+                     * global/static RAM provided.
+                     * Or predefined special meaning, defined in
+                     * StackTypeEnum_t, one of value from
+                     * {StackLongKept = (-1),    // for Longlive_Thread
+                        StackShortStacking  = 1  // for Shortlive_Thread
+                       } */
+//  ListJCBItem_t   xJcbListItem;
                                     /* the Job_Control_Block must support
                                      * double way of link-list */
-
-/// }}} items replaced in Xcb_Base_Items, switch for debug }}}
 //    JCBState_t      stateOfJcb;
                                 /* the state of the Job: pending,
                                  * wait-precondition, executing, terminating,
                                  * freed etc. defined as an enum type
                                  * JCBState_t*/
-//    XCB_State_t     stateOfXcb;
-    uint32_t        uxPriority;     /* the priority for OS kernel to schedule
-                                     * the execution of the job */
+//    uint32_t        uxPriority;   //* the priority for OS kernel to schedule
+                                    /* the execution of the job */
                                     /* this priority also to be used for the
                                      * thread in which the job is started
                                      * executing */
                                     /* IrqPriorityMaskLevelNOMASK  is highest
                                      * Thread_Priority */
-    JobHandlerEntry *threadEntryFunc; /* the function of the job_execution,
-                                       * Its input parameter is a point to the
-                                       * JCB which carry out the Thread */
-    int             stackSize;
-    int             iJobPar;    /* a simple parameter to job_handler. In most
-                                 * case be sufficient.
-                                 * In case of complicated data needed to
-                                 * job_handler, use pJobData */
-    void    *       pJobData;   /* arbitrary point to the complicated data
-                                 * structure.Assigned to NULL when no needed */
-    JCB_ActOption_t actOption;  //need sys to auto act on somepoint
-    BindingState_t  bdState;        /* The JCB's binding state, may combine to stateOfJcb? */
-	void    *       pxBindingObj;
-                                   /* point to binding object, could be none,
-	                                   semaphore, mutex, softTimer etc.*/
-} JCB_t;	/// }}} Job_Control_Block }}}
+// }}} items replaced in Tcb_Base_Items, switch for debug }}}
+  JobHandlerEntry *threadEntryFunc; // the function of the job_execution,
+                                    /* Its input parameter is a point to the
+                                     * JCB which carry out the Thread */
+  int             stackSize;
+  int             iJobPar;    /* a simple parameter to job_handler. In most
+                               * case be sufficient.
+                               * In case of complicated data needed to
+                               * job_handler, use pJobData */
+  void    *       pJobData;   /* arbitrary point to the complicated data
+                               * structure.Assigned to NULL when no needed */
+  JCB_ActOption_t actOption;  //need sys to auto act on somepoint
+
+  //BindingState_t  bdState;  /// The JCB's binding state, may combine
+                              /* to stateOfJcb? */
+  void    *       pxBindingObj; // point to binding object, could be none,
+                                // semaphore, mutex, softTimer etc.*/
+
+} JCB_t;  /// }}} Job_Control_Block }}}
 
 
 typedef enum stack_type_enum
-{  // special number chosen never to be valid address for stack pointer
-   StackLongKept = (-1),    // for Longlive_Thread
-   StackShortStacking = 1      // for Shortlive_Thread
-}  StackTypeEnum_t;
+{ // special number chosen never to be valid address for stack pointer
+  StackLongKept = (-1),    // for Longlive_Thread
+  StackShortStacking = 1      // for Shortlive_Thread
+} StackTypeEnum_t;
 
 #define  ThreadStackTempStacking    ((StackType_t *)StackShortStacking)
 #define  ThreadStackLongKeeping     ((StackType_t *)StackLongKept)
 
-#endif	// }}} RTOS_JOB_CONTROL_BLOCK_H }}}
+#endif  // }}} RTOS_JOB_CONTROL_BLOCK_H }}}

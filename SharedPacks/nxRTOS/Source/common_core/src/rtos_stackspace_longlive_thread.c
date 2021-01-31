@@ -10,11 +10,10 @@
  *  mem pool for Run2blck_Thread Stack Space.
  *  This can be implemented in highly configurable way !!!
  * */
-
 #include  "rtos_stackspace.h"
 #include  "new_stackspace4thread.h"
-#include  "list_tcb.h"
 #include  "arch4rtos_criticallevel.h"
+#include  "rtos_tcb_live_list.h"
 #include  "nxRTOSConfig.h"
 
 /// {{{ Longlive_Thread_StackSpace  {{{

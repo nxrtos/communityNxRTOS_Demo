@@ -46,8 +46,10 @@
 
 #include  "rtos_commit_job.h"
 #include  "rtos_kernel_servicecheck.h"
-#include  "list_jcb.h"
-#include  "list_tcb.h"
+#include  "rtos_jcb_free_list.h"
+#include  "rtos_jcb_ready_list.h"
+#include  "rtos_tcb_live_list.h"
+#include  "rtos_sema_waiting_list.h"
 #include  "arch4rtos_criticallevel.h"
 
 /// {{{ rtos_commit_simplejob {{{
@@ -95,7 +97,7 @@ JCB_t * rtos_commit_job(JCB_t * pxJCB, int iJobPar, void * pxJobData,
       else
 #endif
       {
-        addReadyListJCB(theJCB);
+        pxInsertToReadyJCBList(theJCB);
         // check to find if ReqSchedulerService needed
         rtos_kernel_scheduler_check();
       }
@@ -202,169 +204,4 @@ JCB_t * rtos_commit_deferjob(JCB_t * pxJCB, int iJobPar,
 
     return theJCB;
 }
-
 /// }}}  rtos_commit_deferjob    }}}
-
-/// {{{  rtos_commit_mutexjob    {{{
-JCB_t * rtos_commit_mutexjob(JCB_t * pxJCB, int iJobPar, void * pxJobData,
-                        StackType_t * pThreadStack, int iStackSize,
-                        JobHandlerEntry * pJobHandler, uint32_t xJobPriority,
-                        JCB_ActOption_t autoAct, Mutex_t * pMutex4Job)
-{
-    JCB_t * theJCB  = NULL;
-
-    if(pMutex4Job != NULL)
-    {
-        Mutex_t *   theMutex = pMutex4Job;
-        SysCriticalLevel_t origCriticalLevel = arch4rtos_iGetSysCriticalLevel();
-
-        if(pxJCB == NULL)
-        {
-            theJCB = xpickFreeListJCB();
-        }
-        else
-        {
-            theJCB = pxJCB;
-        }
-
-        if(theJCB != NULL)
-        {   // theJCB has to be valid before do anything
-
-            theJCB->iJobPar = iJobPar ;
-            theJCB->pJobData = pxJobData;
-    //      theJCB->pThread = NULL;
-            theJCB->pThreadStack = pThreadStack;
-            theJCB->stackSize = iStackSize;
-            theJCB->threadEntryFunc = pJobHandler;
-            theJCB->uxPriority = xJobPriority;
-            //theJCB->delayActive = deferTicks;
-            theJCB->stateOfJcb = JCB_WAITINGMUTEX;
-
-            theJCB->actOption = autoAct;
-            theJCB->pxBindingObj = theMutex;
-        }
-
-        //  {{{ critical section enter  {{{
-        arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
-        if(theMutex->owner_thread == NULL)
-        {   // theMutex has no Thread owner,
-            // then deal with JobOwnder or WaitingList
-            if(theMutex->owner_job == NULL)
-            {
-                theMutex->owner_job = theJCB;
-                // add the JCB to ReadyList
-                addReadyListJCB(theJCB);
-            }
-            else    // if(NULL != theMutex->owner_job)
-            {
-                if(theMutex->owner_job->uxPriority > theJCB->uxPriority)
-                {   // move the original JobOwner to WaitingList
-                    // and make the new owner_job
-                    JCB_t   *  pxOrigOwnerJob = theMutex->owner_job;
-
-                    pickReadyListJCB(pxOrigOwnerJob);
-                    addJCBToMutexWaitingList(theMutex, pxOrigOwnerJob);
-                    theMutex->owner_job = theJCB;
-                    // add the JCB to ReadyList
-                    addReadyListJCB(theJCB);
-                }
-                else
-                {   // current JobOwner has same or higher priority
-                    addJCBToMutexWaitingList(theMutex, theJCB);
-                }
-            }
-        }
-        else
-        {   //  theMutex owned by a Thread, put the theJCB into waitingJobList
-            addJCBToMutexWaitingList(theMutex, theJCB);
-        }
-
-        // at the end to check if need to arch4rtosReqSchedulerService(void);
-        if((theMutex->owner_job != NULL) &&
-                (theMutex->owner_job->uxPriority < pxCurrentTCB->uxPriority))
-        {   // for the commit_conditionjob, it only need to check the owner_job
-            // uxPriority
-            arch4rtosReqSchedulerService();
-        }
-        // }}}  critical section exit    }}}
-        arch4rtos_iDropSysCriticalLevel(origCriticalLevel);
-    }
-    else
-    {
-        theJCB = rtos_commit_job(pxJCB, iJobPar, pxJobData, pThreadStack, iStackSize,
-                pJobHandler, xJobPriority, autoAct);
-    }
-    return theJCB;
-}
-/// }}}  rtos_commit_mutexjob    }}}
-
-/// {{{ rtos_commit_semajob    {{{
-JCB_t * rtos_commit_semjob(JCB_t * pxJCB, int iJobPar, void * pxJobData,
-                        StackType_t * pThreadStack, int iStackSize,
-                        JobHandlerEntry * pJobHandler, uint32_t xJobPriority,
-                        JCB_ActOption_t autoAct, Sem_t *  pSem4Job)
-{
-    JCB_t * theJCB  = NULL;
-
-    if(pSem4Job != NULL)
-    {
-        Sem_t *   theSem = pSem4Job;
-        SysCriticalLevel_t origCriticalLevel = arch4rtos_iGetSysCriticalLevel();
-
-        if(pxJCB == NULL)
-        {
-            theJCB = xpickFreeListJCB();
-        }
-        else
-        {
-            theJCB = pxJCB;
-        }
-
-        if(theJCB != NULL)
-        {   // theJCB has to be valid before do anything
-
-            theJCB->iJobPar = iJobPar ;
-            theJCB->pJobData = pxJobData;
-            theJCB->pThreadStack = pThreadStack;
-            theJCB->stackSize = iStackSize;
-            theJCB->threadEntryFunc = pJobHandler;
-            theJCB->uxPriority = xJobPriority;
-            theJCB->stateOfJcb = JCB_WAITINGSEMAG;
-
-            theJCB->actOption = autoAct;
-            theJCB->pxBindingObj = theSem;
-        }
-
-        //  {{{ critical section enter  {{{
-        arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
-        if(theSem->tokens) // != 0
-        {
-
-            theSem->tokens --;
-            theJCB->pxBindingObj = NULL;
-            // add the JCB to ReadyList
-            addReadyListJCB(theJCB);
-        }
-        else    // if(theSem->tokens == 0)
-        { // add JCB to SemWaitingList
-            addJCBToSemWaitingList(theSem, theJCB);
-        }
-
-        {   // for the commit_conditionjob, it only need to check the
-            // owner_job uxPriority
-            arch4rtosReqSchedulerService();
-        }
-        // }}}  critical section exit    }}}
-        arch4rtos_iDropSysCriticalLevel(origCriticalLevel);
-    }
-    else
-    {
-        theJCB = rtos_commit_job(pxJCB, iJobPar, pxJobData, pThreadStack,
-                iStackSize, pJobHandler, xJobPriority, autoAct);
-    }
-
-    return theJCB;
-}
-
-/// }}}  rtos_commit_semjob    }}}
-

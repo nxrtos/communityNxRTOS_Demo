@@ -1,23 +1,28 @@
-/*  rtos_tick_process.c
- * nxRTOS Kernel V0.0.1
- * Copyright (C) 2019  or its affiliates.  All Rights Reserved.
- * *
- * 1 tab == 4 spaces!
- */
-
+/**
+  ******************************************************************************
+  * @file           : rtos_tick_process.h
+  * @brief          : readyJCBList operation
+  ******************************************************************************
+  * @attention
+  * nxRTOS Kernel V0.0.1
+  * Copyright (C) 2019  or its affiliates.  All Rights Reserved.
+  *
+  * 1 tab == 2 spaces!
+  */
 // refer to xPortSysTickHandler( void ),  xTaskIncrementTick()
 // this is hook function need to be called from SySTickISR.
 // on each SysTick increment.
-
 #include  "rtos_tick_process.h"
 #include  "rtos_kernel_state.h"
 #include  "rtos_defer_tcb.h"
-#include  "rtos_semaphore.h"
+#include  "rtos_sema_waiting_list.h"
+#include  "rtos_mutex_waiting_list.h"
 #include  "rtos_mutex.h"
 #include  "rtos_commit_job.h"
 #include  "defer_jcb.h"
-#include  "list_jcb.h"
-#include  "list_tcb.h"
+#include  "rtos_jcb_free_list.h"
+#include  "rtos_jcb_ready_list.h"
+#include  "rtos_tcb_live_list.h"
 #include  "arch4rtos_criticallevel.h"
 #include  "nxRTOSConfig.h"
 
@@ -56,12 +61,13 @@ static  void rtosTickProcess_forDeferTCB(TickType_t  theTick)
       {
         if((theTCB->wFlags & Wait4Sem)  && (theTCB->pxWaitingObj != NULL))
         {   // timeout on acquire Semaphore, remove from  SemaList
-          pickTCBFromSemWaitingList(theTCB->pxWaitingObj, theTCB);
+          //pickTCBFromSemWaitingList(theTCB->pxWaitingObj, theTCB);
+          pxRemoveFromSemWaitList(theTCB->pxWaitingObj, (BaseTCB_t *)theTCB);
         }
-        addTCBToRun2BlckTCBList((BaseTCB_t *)theTCB);
+        insertTCBToRun2BlckTCBList((LiveTCB_t *)theTCB);
         // it may skip this check and do the check altogether at last
-        if((pxCurrentTCB != NULL) &&
-            (pxCurrentTCB->uxPriority > ((BaseTCB_t *)theTCB)->uxPriority ))
+        if((getCurrentTCB() != NULL) &&
+            (getCurrentTCB()->uxPriority > ((LiveTCB_t *)theTCB)->uxPriority ))
         {
           arch4rtosReqSchedulerService();// req kernel to re-schedule;
         }
@@ -85,20 +91,22 @@ static  void rtosTickProcess_forDeferTCB(TickType_t  theTick)
       {
         if((theTCB->wFlags & Wait4Sem)  && (theTCB->pxWaitingObj != NULL))
         { // timeout on acquire Semaphore, remove from  SemaList
-          pickTCBFromSemWaitingList(theTCB->pxWaitingObj, theTCB);
+          //pickTCBFromSemWaitingList(theTCB->pxWaitingObj, theTCB);
+          pxRemoveFromSemWaitList(theTCB->pxWaitingObj, (BaseTCB_t *)theTCB);
         }
 
         if((theTCB->wFlags & Wait4Mutex)  && (theTCB->pxWaitingObj != NULL))
         {   // timeout on acquire Semaphore, remove from  SemaList
-          pickTCBFromMutexWaitingList(theTCB->pxWaitingObj, theTCB);
+          //pickTCBFromMutexWaitingList(theTCB->pxWaitingObj, theTCB);
+          pxRemoveFromMutexWaitList(theTCB->pxWaitingObj, (LiveTCB_t *)theTCB);
           // TODO need to indicate in theTCB the reason of resume is
           //             timeout rather than acquired Mutex
         }
 
-        addTCBToRun2BlckTCBList((BaseTCB_t *)theTCB);
+        insertTCBToRun2BlckTCBList((LiveTCB_t *)theTCB);
         // it may skip this check and do the check altogether at last
-        if((pxCurrentTCB != NULL) &&
-            (pxCurrentTCB->uxPriority > ((BaseTCB_t *)theTCB)->uxPriority ))
+        if((getCurrentTCB() != NULL) &&
+            (getCurrentTCB()->uxPriority > ((LiveTCB_t *)theTCB)->uxPriority ))
         {
           arch4rtosReqSchedulerService();// req kernel to re-schedule;
         }
@@ -138,7 +146,6 @@ int rtosTickThreadHandler(void * pData)
 
   //{{{
   arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
-
   // clear the Pending Flag
   pendingThreadHandler = 0;
   while( xThreadTickCount != xRtosTickCount)
@@ -146,9 +153,8 @@ int rtosTickThreadHandler(void * pData)
     xThreadTickCount++;
     rtosTickProcess_forDeferTCB(xThreadTickCount);
   }
-
-  // }}}
   arch4rtos_iDropSysCriticalLevel(origCriticalLevel);
+  // }}}
 
   { // sanity check
     origCriticalLevel = arch4rtos_iGetSysCriticalLevel();
@@ -174,11 +180,9 @@ void rtosTickHandler( void )
   {   // do all processing only when Kernel_Running
     return;
   }
-
-  //{{{
   origCriticalLevel = arch4rtos_iGetSysCriticalLevel();
+  //{{{
   arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
-
   xRtosTickCount++;
   //rtosTickProcess_forDeferTCB(xRtosTickCount);
   /// {{{ process deferJCB WaitingList {{{
@@ -196,10 +200,10 @@ void rtosTickHandler( void )
       JCB_t * theJCB = (JCB_t *) (theSoftTimer->pActionObj);
       if(theJCB != NULL)
       {
-        addReadyListJCB(theJCB);
+        pxInsertToReadyJCBList(theJCB);
         // it may skip this check and do the check altogether at last
-        if((pxCurrentTCB != NULL) &&
-                            (pxCurrentTCB->uxPriority > theJCB->uxPriority ))
+        if((getCurrentTCB() != NULL) &&
+                            (getCurrentTCB()->uxPriority > theJCB->uxPriority ))
         {
           arch4rtosReqSchedulerService();// req kernel to re-schedule;
         }
@@ -251,10 +255,10 @@ void rtosTickHandler( void )
       JCB_t * theJCB = (JCB_t *) (theSoftTimer->pActionObj);
       if(theJCB != NULL)
       {
-        addReadyListJCB(theJCB);
+        pxInsertToReadyJCBList(theJCB);
         // it may skip this check and do the check altogether at last
-        if((pxCurrentTCB != NULL) &&
-                            (pxCurrentTCB->uxPriority > theJCB->uxPriority ))
+        if((getCurrentTCB() != NULL) &&
+                            (getCurrentTCB()->uxPriority > theJCB->uxPriority ))
         {
           arch4rtosReqSchedulerService();// req kernel to re-schedule;
         }
@@ -285,16 +289,12 @@ void rtosTickHandler( void )
     }
   }
   /// }}} process deferJCB WaitingList  }}}
-
   ///  check reschedule
-  if((pxCurrentTCB != NULL) &&  (pxReadyListJCB != NULL) &&
-                      (pxCurrentTCB->uxPriority > pxReadyListJCB->uxPriority ))
+  if((getCurrentTCB() != NULL) &&  (getReadyJCB() != NULL) &&
+                      (getCurrentTCB()->uxPriority > getReadyJCB()->uxPriority ))
   {
     arch4rtosReqSchedulerService();// req kernel to re-schedule;
   }
-
-
-
 #if  01
   // let rtosTickThreadHandler run in Thread_context
   if(!pendingThreadHandler)
@@ -315,10 +315,7 @@ void rtosTickHandler( void )
   // direct call from ISR
   rtosTickThreadHandler(NULL/*pxJobData*/);
 #endif
-
   arch4rtos_iDropSysCriticalLevel(origCriticalLevel);
-
   // }}}
   return;
 }
-

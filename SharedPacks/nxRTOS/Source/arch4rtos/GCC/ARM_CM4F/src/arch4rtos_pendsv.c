@@ -49,6 +49,9 @@ Registers saved by the software (PendSV_Handler):
 __attribute__ (( naked ))
 void PendSV_Handler(void)
 {
+
+  // TODO , debug trace hard fault, enable before exit
+  __disable_irq();
   /* This is a naked function to perform transition Thread_context to
    * runningThread with highest priority */
   // disable global irq is a safest way to performing thread context switch
@@ -124,12 +127,12 @@ void PendSV_Handler(void)
   // preserve the latest Thread_SP value (in r0) into the ThreadControlBlock
   __asm volatile
   ( /* Get the location of the current TCB. */
-    " ldr   r3,   pxCurrentTCBConst       \n"
+    " ldr   r3,   pxCurrentLiveTCBConst       \n"
     /* now r2 have the pointer to current TCB */
     " ldr   r2,   [r3]                    \n"
     " cmp   r2,   #0                      \n"
     " BEQ   skip_save_top_of_sp     \n"
-    // skip save if pxCurrentTCB == NULL.
+    // skip save if pxCurrentLiveTCB == NULL.
     " str   r0,   [r2]                    \n"
     /* Save the new top of stack. */
     " skip_save_top_of_sp:                \n"
@@ -226,6 +229,6 @@ void PendSV_Handler(void)
   ( // regular return;
     " bx    LR                    \n"
     " .align 4                    \n"
-    "pxCurrentTCBConst: .word pxCurrentTCB  "
+    "pxCurrentLiveTCBConst: .word pxCurrentLiveTCB  "
   );
 }

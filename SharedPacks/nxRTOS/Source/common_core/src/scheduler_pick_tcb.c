@@ -25,7 +25,7 @@
 
 /*-----------------------------------------------------------------------------
  * pickTCB() will try to find and return the Thread with highest priority
- * at the moment in the RTOS system, update it to pxCurrentTCB.
+ * at the moment in the RTOS system, update it to getCurrentTCB().
  * it look between readyJobList, readyThreadList to find the
  * highest priority of Thread to serve to.
  * for performance concern,  a 2-wayLinkList for each prioritizedReadyJobList
@@ -34,39 +34,42 @@
  *  in List and ordered by preemption and stacked.
  *---------------------------------------------------------------------------*/
 
-#include    "pick_tcb.h"
-#include    "list_tcb.h"
-#include    "list_jcb.h"
-#include    "arch4rtos_criticallevel.h"
-#include    "rtos_new_tcb.h"
-#include    "nxRTOSConfig.h"
+#include  "pick_tcb.h"
+#include  "rtos_jcb_ready_list.h"
+#include  "rtos_tcb_live_list.h"
+#include  "arch4rtos_criticallevel.h"
+#include  "rtos_create_tcb.h"
+#include  "rtos_sema_base.h"
+#include  "rtos_semaphore.h"
+#include  "nxRTOSConfig.h"
 
-BaseTCB_t * pickTCB(BaseTCB_t * thisTCB )
+LiveTCB_t * pickTCB(LiveTCB_t * thisTCB )
 {
-    BaseTCB_t * pxSelectToRunTCB;
+    LiveTCB_t * pxSelectToRunTCB;
 	SysCriticalLevel_t  origCriticalLevel = arch4rtos_iGetSysCriticalLevel();
 
 	// {{{ raise Sys_Critical_Level  to designed Kernel_Critical_Level {{{
     arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
 
-	if(pxCurrentTCB == NULL)
+	if(getCurrentTCB() == NULL)
 	{
-		pxCurrentTCB = thisTCB;
+		//getCurrentTCB() = thisTCB;
+		updateCurrentTCB();
 	}
 
 #if     1
 	// extra check, could be omitted
-    if(thisTCB != pxCurrentTCB)
+    if(thisTCB != getCurrentTCB())
     {
         while(1);
     }
 #endif
 
 #ifdef  RTOS_THREAD_STACK_OVERFLOW_TRACE
-    // this the point may switch out from  pxCurrentTCB
-    if(pxCurrentTCB != NULL)
+    // this the point may switch out from  getCurrentTCB()
+    if(getCurrentTCB() != NULL)
     {   /// chek the mark
-        if(*(pxCurrentTCB->pxStackMarkPosition) != RTOS_STACK_OVERFLOW_TRACE_DEFAULTMARK)
+        if(*(getCurrentTCB()->pxStackMarkPosition) != RTOS_STACK_OVERFLOW_TRACE_DEFAULTMARK)
         {   // failed on Mark check, stack has overflow
             while(1);
         }
@@ -75,95 +78,95 @@ BaseTCB_t * pickTCB(BaseTCB_t * thisTCB )
 
     // find the highest priority in readyJob and runningThread.
     // the highest priority of runningThread can be find from pxSelectToRunTCB.
-    // it can could be NULL if pxCurrentTCB is going to terminating itself and
+    // it can could be NULL if getCurrentTCB() is going to terminating itself and
     // it is the highest priority of runningThread.
-    // otherwise, it should be either same as pxRun2TermTCBList_Head or
-    //  pxRun2BlckTCBList_Head.
+    // otherwise, it should be either same as getCurrentRun2TermTCB() or
+    //  getCurrentRun2BlkTCB().
 
     // calculate pxSelectToRunTCB
-    pxSelectToRunTCB = pxRun2TermTCBList_Head;
-    if(pxRun2TermTCBList_Head ==  NULL)
+    pxSelectToRunTCB = getCurrentRun2TermTCB();
+    if(getCurrentRun2TermTCB() ==  NULL)
     {
-        pxSelectToRunTCB = pxRun2BlckTCBList_Head;
+        pxSelectToRunTCB = getCurrentRun2BlkTCB();
     }
-    else if(pxRun2BlckTCBList_Head != NULL)
-    {   // neither pxRun2BlckTCBList_Head or pxRun2TermTCBList_Head be NULL
-        if(pxRun2TermTCBList_Head->uxPriority > pxRun2BlckTCBList_Head->uxPriority)
+    else if(getCurrentRun2BlkTCB() != NULL)
+    {   // neither getCurrentRun2BlkTCB() or getCurrentRun2TermTCB() be NULL
+        if(getCurrentRun2TermTCB()->uxPriority > getCurrentRun2BlkTCB()->uxPriority)
         {
-            pxSelectToRunTCB = pxRun2BlckTCBList_Head;
+            pxSelectToRunTCB = getCurrentRun2BlkTCB();
         }
     }
 
-    // at this point pxSelectToRunTCB has elected among pxRun2TermTCBList_Head
-    // pxRun2BlckTCBList_Head.  Now need to check with pxReadyListJCB
-    if(pxReadyListJCB == NULL)
+    // at this point pxSelectToRunTCB has elected among getCurrentRun2TermTCB()
+    // getCurrentRun2BlkTCB().  Now need to check with getReadyJCB()
+    if(getReadyJCB() == NULL)
     {   // pxSelectToRunTCB has not to be NULL, or SysIdleJob take over.
         if(pxSelectToRunTCB == NULL)
         {
             //while(1); // replace by SysIdleJob
-            pxSelectToRunTCB = pxCurrentTCB;
+            pxSelectToRunTCB = getCurrentTCB();
         }
     }
-    else if((pxSelectToRunTCB == NULL) || (pxReadyListJCB->uxPriority < pxSelectToRunTCB->uxPriority))
+    else if((pxSelectToRunTCB == NULL) || (getReadyJCB()->uxPriority < pxSelectToRunTCB->uxPriority))
     {   // readyJCB has higher priority, so load the Job and replace pxSelectToRunTCB
         JCB_t * theJCB;
 
-        theJCB = pickReadyListJCB(pxReadyListJCB); // the pick will update pxReadyListJCB
+        theJCB = pxRemoveFromReadyJCBList(getReadyJCB()); // the pick will update getReadyJCB()
         if(theJCB == NULL)
-        {   // this should never happen as pxReadyListJCB != NULL. may remove
+        {   // this should never happen as getReadyJCB() != NULL. may remove
             while(1);
         }
-        // load_job_to_thread(pxReadyListJCB);
-        pxSelectToRunTCB = createTCB(theJCB);
-        // update pxRun2BlckTCBList_Head or pxRun2TermTCBList_Head
+        // load_job_to_thread(getReadyJCB());
+        pxSelectToRunTCB = rtos_create_tcb(theJCB);
+        // update getCurrentRun2BlkTCB() or getCurrentRun2TermTCB()
         //  and pxSelectToRunTCB
         if(pxSelectToRunTCB == NULL)
         {   // failed to acquire TCB or StackSpace
             // push theJCB back to ReadyListJCB
-            addReadyListJCB(theJCB);
+            pxInsertToReadyJCBList(theJCB);
 
             // promote Running TCBList_Head to
             if(theJCB->pThreadStack == ThreadStackTempStacking)
             {   // promote currentRun2TermTCB
-                if((pxRun2TermTCBList_Head != NULL) &&
-                        (pxRun2TermTCBList_Head->uxPriority >= theJCB->uxPriority))
+                if((getCurrentRun2TermTCB() != NULL) &&
+                        (getCurrentRun2TermTCB()->uxPriority >= theJCB->uxPriority))
                 {   //
-                    pxRun2TermTCBList_Head->uxPriority = theJCB->uxPriority;
+                    getCurrentRun2TermTCB()->uxPriority = theJCB->uxPriority;
                 }
                 else
                 {   // looks something wrong. it may not be fatal but debug
                     while(1);
                 }
             }
-            else // if(theJCB->pThreadStack == StackKept)
-            {   // for stack NOT Shared, it seems no solution but just do the
-                //  similar to promote current executing in hope to terminate
-                if((pxRun2BlckTCBList_Head != NULL) &&
-                        (pxRun2BlckTCBList_Head->uxPriority > theJCB->uxPriority))
-                {   //
-                    pxRun2BlckTCBList_Head->uxPriority = theJCB->uxPriority;
-                }
-                else
-                {   // looks something wrong. it may not be fatal but debug
-                    while(1);
-                }
-             }
+          else // if(theJCB->pThreadStack == StackKept)
+          {   // for stack NOT Shared, it seems no solution but just do the
+            //  similar to promote current executing in hope to terminate
+            if((getCurrentRun2BlkTCB() != NULL) &&
+                    (getCurrentRun2BlkTCB()->uxPriority > theJCB->uxPriority))
+            {   //
+                getCurrentRun2BlkTCB()->uxPriority = theJCB->uxPriority;
+            }
+            else
+            {   // looks something wrong. it may not be fatal but debug
+                while(1);
+            }
+          }
         }
         else
-        {
-            if(theJCB->pThreadStack ==ThreadStackTempStacking)
-            {
-                pushRun2TermListTCB(pxSelectToRunTCB);
-            }
-            else // if(theJCB->pThreadStack == StackKept)
-            {
-                addTCBToRun2BlckTCBList(pxSelectToRunTCB);
-             }
+        { // successful create stack space to load JCB to execution
+          if(theJCB->pThreadStack ==ThreadStackTempStacking)
+          {
+            pushRun2TermListTCB(pxSelectToRunTCB);
+          }
+          else // if(theJCB->pThreadStack == StackKept)
+          {
+            insertTCBToRun2BlckTCBList(pxSelectToRunTCB);
+          }
         }
     }
 
 #ifdef  RTOS_THREAD_STACK_OVERFLOW_TRACE
-    // this the point will switch in into  pxCurrentTCB
+    // this the point will switch in into  getCurrentTCB()
     if(pxSelectToRunTCB != NULL)
     {   /// restore  the mark
         *(pxSelectToRunTCB->pxStackMarkPosition) = RTOS_STACK_OVERFLOW_TRACE_DEFAULTMARK;
@@ -171,12 +174,13 @@ BaseTCB_t * pickTCB(BaseTCB_t * thisTCB )
 #endif
 
     if(pxSelectToRunTCB != NULL)
-    {   // update pxCurrentTCB here.
-        pxCurrentTCB = pxSelectToRunTCB;
+    {   // update getCurrentTCB() here.
+        //getCurrentTCB() = pxSelectToRunTCB;
+        updateCurrentTCB();
     }
     else
     {  // prepare for value to return
-       pxSelectToRunTCB = pxCurrentTCB;
+       pxSelectToRunTCB = getCurrentTCB();
     }
 
     arch4rtos_iDropSysCriticalLevel(origCriticalLevel);

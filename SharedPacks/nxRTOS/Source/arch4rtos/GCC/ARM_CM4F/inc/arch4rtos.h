@@ -85,22 +85,30 @@ extern uint32_t xSetContextPriorityLevel(void * contextHandle, uint32_t newLevel
 
 __STATIC_FORCEINLINE    void  arch4rtosReqSchedulerService()
 {
-    // trigger PendSV
-    SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
+  // trigger PendSV
+  SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
 }
 
 __STATIC_FORCEINLINE    void  arch4rtos_thread_termination(void * theTCB)
 {
-    (void) theTCB;  // expect in R0
-    __asm volatile("    \n");
-    __asm volatile
-    (
-      "  svc    #0xFF   \n"  // SVC_FF_handler()
-    );
-    __asm volatile
-    (
-      "  nop    \n"
-    );
+  //void * inR0;
+  //(void) theTCB;  // expect in R0
+  __asm volatile("    \n");
+  //__NVIC_SetPriority(SVCall_IRQn, 0);
+  __NVIC_SetPriority(-5, 0);
+  __enable_irq();
+  __DSB();
+  __ISB();
+  //    inR0 = theTCB;
+  __asm volatile
+  (
+    "  ldr    r0, [r7, #56] \n" // trick to play to load theTCB to R0
+    "  svc    #0xFF   \n"  // SVC_FF_handler()
+  );
+  __asm volatile
+  (
+    "  nop    \n"
+  );
 }
 
 #endif /* ARCH4RTOS_H */

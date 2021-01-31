@@ -27,7 +27,8 @@
 #include    "rtos_tick_process.h"
 #include    "arch4rtos_criticallevel.h"
 #include    "rtos_jcb.h"
-#include    "list_jcb.h"
+#include    "rtos_jcb_free_list.h"
+#include    "rtos_jcb_ready_list.h"
 #include    "defer_jcb.h"   /* some of API should move to tickProcess.h */
 #include    "nxRTOSConfig.h"
 

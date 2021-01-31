@@ -28,7 +28,7 @@
 /* USER CODE BEGIN Includes */
 #include "bsp.h"
 #include "arch4rtos.h"
-#include "list_jcb.h"
+#include "rtos_jcb_ready_list.h"
 #include "rtos_start_kernel.h"
 #include "rtos_tick_process.h"
 #include "arch4rtos_criticallevel.h"

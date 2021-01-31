@@ -96,8 +96,8 @@ StackType_t *arch4rtos_pInitThreadStack( StackType_t *pxTopOfStack, JCB_t *pTheJ
     pxTopOfStack -= 5;  /* R12, R3, R2 and R1. */
     *pxTopOfStack = ( StackType_t ) pTheJCB;   /* R0 */
 
-    pxTopOfStack--;
-    *pxTopOfStack = ( 0xfffffffd ); //  portINITIAL_EXC_RETURN for  EXC_RETURN_value (1 reg size) */
+    pxTopOfStack--;     // 0xFFFFFFFD-Thread Stack uses PSP
+    *pxTopOfStack = ( 0xFFFFFFFD ); //  EXC_RETURN_value (1 reg size) */
 
     pxTopOfStack -= 8; /* R11...R4 (8 regs). */
 

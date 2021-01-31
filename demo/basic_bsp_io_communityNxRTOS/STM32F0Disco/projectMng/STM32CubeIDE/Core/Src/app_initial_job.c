@@ -54,7 +54,7 @@
 
 int app_initial_Job_Handler(void * par)
 {
-    //Sem_t     * theSem;
+    //Sema_t     * theSem;
 	JCB_t * initialJCB =(JCB_t *)par;
 
 	// sanity check for initial_Job Thread

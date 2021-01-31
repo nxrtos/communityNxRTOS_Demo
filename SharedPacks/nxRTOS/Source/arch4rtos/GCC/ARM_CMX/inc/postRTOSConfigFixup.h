@@ -1,6 +1,6 @@
 /*
  * nxRTOS Kernel V0.0.1		postRTOSConfigFixup.h
- * Copyright (C) 2019 . or its affiliates.  All Rights Reserved.
+ * Copyright (C) 2019 nxrtos or its affiliates.  All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -25,6 +25,14 @@
 
 #ifndef  _DEFUALT_RTOSCONFIG_FIXUP_H
 #define  _DEFUALT_RTOSCONFIG_FIXUP_H
+
+// help eclipse index
+#ifndef   NXRTOS_CONFIG_H
+#include  "nxRTOSConfig.h"
+#endif
+
+#include  "arch4rtos_criticallevel.h"
+#include  "postRTOSConfigArchFixup.h"
 
 /// {{{   THREAD_PRIORITY   {{{
 #if (configIdlePriority < (0x01 << __NVIC_PRIO_BITS))
@@ -118,7 +126,6 @@
   #define RTOS_SUPPORT_MUTEX                     1
 #endif
 
-
 #if  defined(configSYS_SEMAPHORE_NUM)
   #define  RTOS_SYS_SEMAPHORE_NUM    configSYS_SEMAPHORE_NUM
 #else
@@ -153,6 +160,77 @@
 #define RTOS_IDLE_THREAD_STACKSIZE      0
 #endif
 
-#include  "postRTOSConfigArchFixup.h"
+// RTOS_SVC_ENTRY_PRIORITY must to be between RTOS_SYSCRITICALLEVEL and
+//  LOWEST_ISRCRITICALLEVEL inclusive.
+#if  defined(configSVC_ENTRY_PRIORITY)
+#if (configSVC_ENTRY_PRIORITY < RTOS_SYSCRITICALLEVEL)
+#warning  "configSVC_ENTRY_PRIORITY exceed RTOS_SYSCRITICALLEVEL"
+#define RTOS_SVC_ENTRY_PRIORITY         RTOS_SYSCRITICALLEVEL
+#elif (configSVC_ENTRY_PRIORITY > LOWEST_ISRCRITICALLEVEL)
+#warning  "configSVC_ENTRY_PRIORITY exceed LOWEST_ISRCRITICALLEVEL"
+#define RTOS_SVC_ENTRY_PRIORITY         LOWEST_ISRCRITICALLEVEL
+#else
+#define RTOS_SVC_ENTRY_PRIORITY         configSVC_ENTRY_PRIORITY
+#endif
+#else
+// set default RTOS_SVC_ENTRY_PRIORITY to RTOS_SYSCRITICALLEVEL for safe.
+#define RTOS_SVC_ENTRY_PRIORITY         RTOS_SYSCRITICALLEVEL
+//#define RTOS_SVC_ENTRY_PRIORITY         LOWEST_ISRCRITICALLEVEL
+#endif
 
+// ENABLE_SUPPORT_SEMA
+#if   defined(configSupportSemaphoreConditionJob)
+  #if  (configSupportSemaphoreConditionJob)
+    #error	"community version does NOT support SEMA_CONDITION_JOB"
+  #endif
+  #define SUPPORT_SEMA_CONDITION_JOB        configSupportSemaphoreConditionJob
+#else
+// community version does NOT support SEMA_CONDITION_JOB
+#define SUPPORT_SEMA_CONDITION_JOB        0
+#endif
+
+#if   SUPPORT_SEMA_CONDITION_JOB
+#define SUPPORT_SEMA_ATTR_JOB_REASSIGN    01
+
+//#define SUPPORT_SEMA_ATTR_JOB_REASSIGN 01
+#if   (SUPPORT_SEMA_ATTR_JOB_REASSIGN)   || (0)
+  #define SUPPORT_SEMA_ATTRIBUTES         01
+#else
+  #define SUPPORT_SEMA_ATTRIBUTES         0
+#endif
+#endif
+
+// ENABLE_SUPPORT_MUTEX
+#if   defined(configSupportMutexConditionJob)
+  #if  (configSupportMutexConditionJob)
+    #error	"community version does NOT support MUTEX_CONDITION_JOB"
+  #endif
+  #define SUPPORT_MUTEX_CONDITION_JOB       configSupportMutexConditionJob
+#else
+  // community version does NOT support MUTEX_CONDITION_JOB
+  #define SUPPORT_MUTEX_CONDITION_JOB       0
+#endif
+
+#if !(SUPPORT_MUTEX_CONDITION_JOB)
+#define SUPPORT_MUTEX_ATTR_JOB_REASSIGN   0
+#else
+#define SUPPORT_MUTEX_ATTR_JOB_REASSIGN   01
+#endif
+
+#define SUPPORT_MUTEX_ATTR_RECURSIVE    01
+#define SUPPORT_MUTEX_ATTR_PRIO_INHRT   01
+#define SUPPORT_MUTEX_ATTR_AUTORELS     01
+
+#if   (SUPPORT_MUTEX_ATTR_JOB_REASSIGN)   \
+      || (SUPPORT_MUTEX_ATTR_RECURSIVE)   \
+      || (SUPPORT_MUTEX_ATTR_PRIO_INHRT)  \
+      || (SUPPORT_MUTEX_ATTR_AUTORELS)
+  #define SUPPORT_MUTEX_ATTRIBUTES        01
+#else
+  #define SUPPORT_MUTEX_ATTRIBUTES        0
+#endif
+
+#define RTOS_JCB_DEBUG_TRACE            1
+
+#define RTOS_TCB_DEBUG_TRACE            1
 #endif /* _DEFUALT_RTOSCONFIG_FIXUP_H */

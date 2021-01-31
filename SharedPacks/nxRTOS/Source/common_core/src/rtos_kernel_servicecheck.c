@@ -5,10 +5,10 @@
  * 1 tab == 4 spaces!
  */
 #include  "rtos_kernel_servicecheck.h"
+#include  "rtos_tcb_live_list.h"
 #include  "arch4rtos_criticallevel.h"
 #include  "nxRTOSConfig.h"
-#include  "list_tcb.h"
-#include  "list_jcb.h"
+#include  "rtos_jcb_ready_list.h"
 
 int  rtos_kernel_scheduler_check()
 {
@@ -17,11 +17,11 @@ int  rtos_kernel_scheduler_check()
 
     // critical section enter   {{{
     arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
-    if(((pxCurrentTCB == NULL) &&  (pxReadyListJCB != NULL))
+    if(((getCurrentTCB() == NULL) &&  (getReadyJCB() != NULL))
        || // more check on pxReadyListTCB
-       ((pxCurrentTCB != NULL) &&
-        (pxReadyListJCB != NULL) &&
-        (pxReadyListJCB->uxPriority < pxCurrentTCB->uxPriority)
+       ((getCurrentTCB() != NULL) &&
+        (getReadyJCB() != NULL) &&
+        (getReadyJCB()->uxPriority < getCurrentTCB()->uxPriority)
        )
       )
     {

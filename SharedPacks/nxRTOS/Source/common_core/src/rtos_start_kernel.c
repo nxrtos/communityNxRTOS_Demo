@@ -7,10 +7,12 @@
 
 #include  "rtos_start_kernel.h"
 #include  "rtos_tick_process.h"
-#include  "list_jcb.h"
+#include  "rtos_jcb_free_list.h"
+#include  "rtos_jcb_ready_list.h"
 #include  "rtos_kernel_state.h"
 #include  "rtos_commit_job.h"
 #include  "rtos_softtimer.h"
+#include  "rtos_sema_free_list.h"
 #include  "arch4rtos_prekernel_init.h"
 #include  "arch4rtos_firstjob.h"
 
@@ -67,7 +69,7 @@ int  rtos_start_kernel()
       pTheJCB->actOption = RelocateToThreadStack;
 
       // ?? should push theJCB into readyList??
-      // addReadyListJCB(pTheJCB);
+      // pxInsertToReadyJCBList(pTheJCB);
 
       // need this for CM0 using softBASEPRI, may optimize later
       // if NO HW BASEPRI

@@ -7,9 +7,9 @@
 
 #include  "rtos_stackspace.h"
 #include  "new_stackspace4thread.h"
-#include  "list_tcb.h"
 #include  "arch4rtos_criticallevel.h"
 #include  "arch4rtos_threadstack.h"
+#include  "rtos_tcb_live_list.h"
 #include  "nxRTOSConfig.h"
 
 /// {{{     {{{
@@ -46,16 +46,15 @@ StackType_t * newStackSpace4Run2TermThread(unsigned long  size)
   // critical section enter
   arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
 
-  if(pxRun2TermTCBList_Head == NULL)
+  if(getCurrentRun2TermTCB() == NULL)
   { // this will be first run2TermTCB
     //theSP =(StackType_t *) INITIAL_Run2TermThread_StackPoint;
     theSP = getInitialSPSetting4Run2TermThread();
   }
   else
-  { // existing running run2TermThread
+  {
     theSP = NULL;
   }
-
   // critical section exit
   arch4rtos_iDropSysCriticalLevel(origCriticalLevel);
   return  theSP;

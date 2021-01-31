@@ -32,6 +32,10 @@
 #ifndef __CMSIS_DEVICE_H
 #define __CMSIS_DEVICE_H
 
+#if   0
+#include "CMSIS_Device.txt.h"
+#endif
+
 #ifdef __cplusplus
  extern "C" {
 #endif /* __cplusplus */

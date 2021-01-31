@@ -24,7 +24,7 @@
 
 /*-----------------------------------------------------------------------------
  * DeferTCB is similar to DeferJCB in the management , but the all items
- * for deferring Management is build into BaseTCB_t structure rather than
+ * for deferring Management is build into LiveTCB_t structure rather than
  * DeferJCB through seperated SoftTimer_ControlBlock binding with JCB.
  *
  * There are pxOsCurrentDeferTCBWaitingList and
@@ -50,39 +50,39 @@ volatile R2BTCB_t * pxDeferTCBOverflowWaitingList = NULL;
 
 R2BTCB_t *  pickFromDeferTCBWaitingList(R2BTCB_t *  theR2BTCB )
 {
-    BaseTCB_t  * theTCB = (BaseTCB_t  *)theR2BTCB;
+    LiveTCB_t  * theTCB = (LiveTCB_t  *)theR2BTCB;
     SysCriticalLevel_t origCriticalLevel = arch4rtos_iGetSysCriticalLevel();
 
     if((theR2BTCB != NULL)) // && (theR2BTCB->xResumeOnTicks != 0))
     {
-        BaseTCB_t  * refTCB;
+        LiveTCB_t  * refTCB;
         // {{{  critical section enter  {{{
         arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
 
         theR2BTCB->xResumeOnTicks = 0;
-        refTCB = (BaseTCB_t  *)theTCB->xStateListItem.next;
+        refTCB = (LiveTCB_t  *)theTCB->xTcbListItem.next;
         if(refTCB != NULL)
         {
-            refTCB->xStateListItem.prev = theTCB->xStateListItem.prev;
+            refTCB->xTcbListItem.prev = theTCB->xTcbListItem.prev;
         }
-        refTCB = (BaseTCB_t  *)theTCB->xStateListItem.prev;
+        refTCB = (LiveTCB_t  *)theTCB->xTcbListItem.prev;
         if(refTCB != NULL)
         {
-            refTCB->xStateListItem.next = theTCB->xStateListItem.next;
+            refTCB->xTcbListItem.next = theTCB->xTcbListItem.next;
         }
         //  theR2BTCB looks the HEAD of List
         if(pxDeferTCBCurrentWaitingList == theR2BTCB)
         {
-            pxDeferTCBCurrentWaitingList = (R2BTCB_t *)theTCB->xStateListItem.next;
+            pxDeferTCBCurrentWaitingList = (R2BTCB_t *)theTCB->xTcbListItem.next;
         }
         else if(pxDeferTCBOverflowWaitingList == theR2BTCB)
         {
-            pxDeferTCBOverflowWaitingList = (R2BTCB_t *)theTCB->xStateListItem.next;
+            pxDeferTCBOverflowWaitingList = (R2BTCB_t *)theTCB->xTcbListItem.next;
         }
 
-        {// now clean theTCB->xStateListItem;  May not needed
-            theTCB->xStateListItem.next = NULL;
-            theTCB->xStateListItem.prev = NULL;
+        {// now clean theTCB->xTcbListItem;  May not needed
+            theTCB->xTcbListItem.next = NULL;
+            theTCB->xTcbListItem.prev = NULL;
         }
         // }}}  critical section exit   }}}
         arch4rtos_iDropSysCriticalLevel(origCriticalLevel);
@@ -96,7 +96,7 @@ R2BTCB_t *  pickFromDeferTCBWaitingList(R2BTCB_t *  theR2BTCB )
 
 R2BTCB_t *  addToDeferTCBWaitingList(R2BTCB_t *  theR2BTCB )
 {
-    BaseTCB_t  * theTCB = (BaseTCB_t  *)theR2BTCB;
+    LiveTCB_t  * theTCB = (LiveTCB_t  *)theR2BTCB;
     SysCriticalLevel_t origCriticalLevel = arch4rtos_iGetSysCriticalLevel();
 
     if((theR2BTCB != NULL) && (theR2BTCB->xResumeOnTicks != 0))
@@ -111,8 +111,8 @@ R2BTCB_t *  addToDeferTCBWaitingList(R2BTCB_t *  theR2BTCB )
             if(pxDeferTCBCurrentWaitingList == NULL)
             {
                 pxDeferTCBCurrentWaitingList = theR2BTCB;
-                theTCB->xStateListItem.prev = NULL;
-                theTCB->xStateListItem.next = NULL;
+                theTCB->xTcbListItem.prev = NULL;
+                theTCB->xTcbListItem.next = NULL;
             }
             else
             {
@@ -120,10 +120,10 @@ R2BTCB_t *  addToDeferTCBWaitingList(R2BTCB_t *  theR2BTCB )
 
                 while(refTCB->xResumeOnTicks <= theR2BTCB->xResumeOnTicks)
                 {   // try to find right refTCB
-                    if( ((BaseTCB_t *)refTCB)->xStateListItem.next != NULL)
+                    if( ((LiveTCB_t *)refTCB)->xTcbListItem.next != NULL)
                     {   //
                         refTCB = (R2BTCB_t *)
-                                    ((BaseTCB_t *)refTCB)->xStateListItem.next;
+                                    ((LiveTCB_t *)refTCB)->xTcbListItem.next;
                     }
                     else
                     {   // refSoftTimer  is the last one in SoftTimerWaitingList;
@@ -133,30 +133,30 @@ R2BTCB_t *  addToDeferTCBWaitingList(R2BTCB_t *  theR2BTCB )
 
                 if(refTCB->xResumeOnTicks <= theR2BTCB->xResumeOnTicks)
                 {   // add theR2BTCB  after refTCB
-                    ((BaseTCB_t *)theR2BTCB)->xStateListItem.prev = (ListXItem_t *)refTCB;
-                    ((BaseTCB_t *)theR2BTCB)->xStateListItem.next = // NULL
-                                ((BaseTCB_t *)refTCB)->xStateListItem.next;
-                    ((BaseTCB_t *)refTCB)->xStateListItem.next = (ListXItem_t *)theR2BTCB;
-                    if(((BaseTCB_t *)theR2BTCB)->xStateListItem.next != NULL)
+                    ((LiveTCB_t *)theR2BTCB)->xTcbListItem.prev = (LiveTCB_t *)refTCB;
+                    ((LiveTCB_t *)theR2BTCB)->xTcbListItem.next = // NULL
+                                ((LiveTCB_t *)refTCB)->xTcbListItem.next;
+                    ((LiveTCB_t *)refTCB)->xTcbListItem.next = (LiveTCB_t *)theR2BTCB;
+                    if(((LiveTCB_t *)theR2BTCB)->xTcbListItem.next != NULL)
                     {
-                        refTCB = (R2BTCB_t *)((BaseTCB_t *)theR2BTCB)->xStateListItem.next;
-                        ((BaseTCB_t *)refTCB)->xStateListItem.prev = (ListXItem_t *)theR2BTCB;
+                        refTCB = (R2BTCB_t *)((LiveTCB_t *)theR2BTCB)->xTcbListItem.next;
+                        ((LiveTCB_t *)refTCB)->xTcbListItem.prev = (LiveTCB_t *)theR2BTCB;
                     }
                 }
                 else
                 {   // add theR2BTCB  before refTCB
-                    ((BaseTCB_t *)theR2BTCB)->xStateListItem.prev =
-                                    ((BaseTCB_t *)refTCB)->xStateListItem.prev;
-                    ((BaseTCB_t *)theR2BTCB)->xStateListItem.next = (ListXItem_t *)refTCB;
-                    ((BaseTCB_t *)refTCB)->xStateListItem.prev = (ListXItem_t *)theR2BTCB;
+                    ((LiveTCB_t *)theR2BTCB)->xTcbListItem.prev =
+                                    ((LiveTCB_t *)refTCB)->xTcbListItem.prev;
+                    ((LiveTCB_t *)theR2BTCB)->xTcbListItem.next = (LiveTCB_t *)refTCB;
+                    ((LiveTCB_t *)refTCB)->xTcbListItem.prev = (LiveTCB_t *)theR2BTCB;
                     if(refTCB == pxDeferTCBCurrentWaitingList)
                     {   // if the refTCB is the HEAD, then update the HEAD
                         pxDeferTCBCurrentWaitingList = theR2BTCB;
                     }
-                    if(((BaseTCB_t *)theR2BTCB)->xStateListItem.prev != NULL)
+                    if(((LiveTCB_t *)theR2BTCB)->xTcbListItem.prev != NULL)
                     {
-                        refTCB = (R2BTCB_t *)((BaseTCB_t *)theR2BTCB)->xStateListItem.prev;
-                        ((BaseTCB_t *)refTCB)->xStateListItem.next = (ListXItem_t *)theR2BTCB;
+                        refTCB = (R2BTCB_t *)((LiveTCB_t *)theR2BTCB)->xTcbListItem.prev;
+                        ((LiveTCB_t *)refTCB)->xTcbListItem.next = (LiveTCB_t *)theR2BTCB;
                     }
                 }
             }
@@ -166,8 +166,8 @@ R2BTCB_t *  addToDeferTCBWaitingList(R2BTCB_t *  theR2BTCB )
             if(pxDeferTCBOverflowWaitingList == NULL)
             {
                 pxDeferTCBOverflowWaitingList = theR2BTCB;
-                theTCB->xStateListItem.prev = NULL;
-                theTCB->xStateListItem.next = NULL;
+                theTCB->xTcbListItem.prev = NULL;
+                theTCB->xTcbListItem.next = NULL;
             }
             else
             {
@@ -175,10 +175,10 @@ R2BTCB_t *  addToDeferTCBWaitingList(R2BTCB_t *  theR2BTCB )
 
                 while(refTCB->xResumeOnTicks < theR2BTCB->xResumeOnTicks)
                 {
-                    if( ((BaseTCB_t *)refTCB)->xStateListItem.next != NULL)
+                    if( ((LiveTCB_t *)refTCB)->xTcbListItem.next != NULL)
                     {   //
                         refTCB = (R2BTCB_t *)
-                                    ((BaseTCB_t *)refTCB)->xStateListItem.next;
+                                    ((LiveTCB_t *)refTCB)->xTcbListItem.next;
                     }
                     else
                     {   // refSoftTimer  is the last one in SoftTimerWaitingList;
@@ -188,30 +188,30 @@ R2BTCB_t *  addToDeferTCBWaitingList(R2BTCB_t *  theR2BTCB )
 
                 if(refTCB->xResumeOnTicks < theR2BTCB->xResumeOnTicks)
                 {   // add theR2BTCB  after refTCB
-                    ((BaseTCB_t *)theR2BTCB)->xStateListItem.prev = (ListXItem_t *)refTCB;
-                    ((BaseTCB_t *)theR2BTCB)->xStateListItem.next = // NULL
-                                ((BaseTCB_t *)refTCB)->xStateListItem.next;
-                    ((BaseTCB_t *)refTCB)->xStateListItem.next = (ListXItem_t *)theR2BTCB;
-                    if(((BaseTCB_t *)theR2BTCB)->xStateListItem.next != NULL)
+                    ((LiveTCB_t *)theR2BTCB)->xTcbListItem.prev = (LiveTCB_t *)refTCB;
+                    ((LiveTCB_t *)theR2BTCB)->xTcbListItem.next = // NULL
+                                ((LiveTCB_t *)refTCB)->xTcbListItem.next;
+                    ((LiveTCB_t *)refTCB)->xTcbListItem.next = (LiveTCB_t *)theR2BTCB;
+                    if(((LiveTCB_t *)theR2BTCB)->xTcbListItem.next != NULL)
                     {
-                        refTCB = (R2BTCB_t *)((BaseTCB_t *)theR2BTCB)->xStateListItem.next;
-                        ((BaseTCB_t *)refTCB)->xStateListItem.prev = (ListXItem_t *)theR2BTCB;
+                        refTCB = (R2BTCB_t *)((LiveTCB_t *)theR2BTCB)->xTcbListItem.next;
+                        ((LiveTCB_t *)refTCB)->xTcbListItem.prev = (LiveTCB_t *)theR2BTCB;
                     }
                 }
                 else
                 {   // add theR2BTCB  before refTCB
-                    ((BaseTCB_t *)theR2BTCB)->xStateListItem.prev =
-                                    ((BaseTCB_t *)refTCB)->xStateListItem.prev;
-                    ((BaseTCB_t *)theR2BTCB)->xStateListItem.next = (ListXItem_t *)refTCB;
-                    ((BaseTCB_t *)refTCB)->xStateListItem.prev = (ListXItem_t *)theR2BTCB;
+                    ((LiveTCB_t *)theR2BTCB)->xTcbListItem.prev =
+                                    ((LiveTCB_t *)refTCB)->xTcbListItem.prev;
+                    ((LiveTCB_t *)theR2BTCB)->xTcbListItem.next = (LiveTCB_t *)refTCB;
+                    ((LiveTCB_t *)refTCB)->xTcbListItem.prev = (LiveTCB_t *)theR2BTCB;
                     if(refTCB == pxDeferTCBOverflowWaitingList)
                     {   // if the refTCB is the HEAD, then update the HEAD
                         pxDeferTCBOverflowWaitingList = theR2BTCB;
                     }
-                    if(((BaseTCB_t *)theR2BTCB)->xStateListItem.prev != NULL)
+                    if(((LiveTCB_t *)theR2BTCB)->xTcbListItem.prev != NULL)
                     {
-                        refTCB = (R2BTCB_t *)((BaseTCB_t *)theR2BTCB)->xStateListItem.prev;
-                        ((BaseTCB_t *)refTCB)->xStateListItem.next = (ListXItem_t *)theR2BTCB;
+                        refTCB = (R2BTCB_t *)((LiveTCB_t *)theR2BTCB)->xTcbListItem.prev;
+                        ((LiveTCB_t *)refTCB)->xTcbListItem.next = (LiveTCB_t *)theR2BTCB;
                     }
                 }
             }
@@ -226,7 +226,7 @@ R2BTCB_t *  addToDeferTCBWaitingList(R2BTCB_t *  theR2BTCB )
     return  (R2BTCB_t *)theTCB;
 }
 
-#include    "list_tcb.h"
+#include  "rtos_tcb_live_list.h"
 void vThreadDelay( const TickType_t xTicksToDelay )
 {
     if(xTicksToDelay)
@@ -237,13 +237,13 @@ void vThreadDelay( const TickType_t xTicksToDelay )
         arch4rtos_iRaiseSysCriticalLevel(RTOS_SYSCRITICALLEVEL);
         // it has to be in a Run2BlckThread_context. add check here
 
-        theTCB = (R2BTCB_t *)pickTCBFromRun2BlckTCBList(pxCurrentTCB);
+        theTCB = (R2BTCB_t *)removeTCBFromRun2BlckTCBList(getCurrentTCB());
         if(theTCB != NULL)
         {
             theTCB->xResumeOnTicks = xTicksToDelay;
             theTCB->wFlags = Wait4Ticks;
             addToDeferTCBWaitingList(theTCB);
-            // at this point need pxCurrentTCB has been removed from Run2BlckTCBList
+            // at this point need getCurrentTCB() has been removed from Run2BlckTCBList
            arch4rtosReqSchedulerService();// req kernel to re-schedule;
         }
         // }}}  critical section exit   }}}

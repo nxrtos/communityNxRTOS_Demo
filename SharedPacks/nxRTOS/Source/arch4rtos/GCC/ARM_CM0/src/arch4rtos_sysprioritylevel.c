@@ -74,9 +74,9 @@ uint32_t xGetThreadPriorityLevel(void)
 {
     uint32_t    thePriority;
 
-    if(pxCurrentTCB != NULL)
+    if(getCurrentTCB() != NULL)
     {
-        thePriority = pxCurrentTCB->uxPriority;
+        thePriority = getCurrentTCB()->uxPriority;
     }
     else
     {
@@ -98,9 +98,9 @@ uint32_t xSetThreadPriorityLevel(uint32_t  newLevel)
         thePriority = LOWEST_SYSCRITICALLEVEL;
     }
 
-    if(pxCurrentTCB != NULL)
+    if(getCurrentTCB() != NULL)
     {
-        pxCurrentTCB->uxPriority = thePriority;
+        getCurrentTCB()->uxPriority = thePriority;
     }
     else
     {

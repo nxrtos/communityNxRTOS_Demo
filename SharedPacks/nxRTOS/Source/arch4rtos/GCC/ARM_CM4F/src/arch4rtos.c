@@ -130,7 +130,7 @@ uint32_t xSetOsPriorityMaskLevel(uint32_t newLevel)
 #if  0
 #include "rtos_jcb.h"
 
-BaseTCB_t *	xGetTheadHandle(void);
+LiveTCB_t *	xGetTheadHandle(void);
 
 uint32_t xGetSysIrqPriorityLevel(SysIRQ_Type xSysIrq)
 {
@@ -155,7 +155,7 @@ uint32_t xGetThreadPriorityLevel(void * xThreadHandle)
 
 	if(xThreadHandle != NULL)
 	{
-		return ((BaseTCB_t *)xThreadHandle)->uxPriority;
+		return ((LiveTCB_t *)xThreadHandle)->uxPriority;
 	}
 	else
 	{
@@ -176,8 +176,8 @@ uint32_t xSetThreadPriorityLevel(void * xThreadHandle, uint32_t newLevel)
 
 	if(xThreadHandle != NULL)
 	{
-		((BaseTCB_t *)xThreadHandle)->uxPriority = newLevel;
-		xThreadPriorityLevel = ((BaseTCB_t *)xThreadHandle)->uxPriority;
+		((LiveTCB_t *)xThreadHandle)->uxPriority = newLevel;
+		xThreadPriorityLevel = ((LiveTCB_t *)xThreadHandle)->uxPriority;
 	}
 	else
 	{	// == NULL, current Thread

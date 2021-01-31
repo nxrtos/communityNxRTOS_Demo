@@ -66,14 +66,14 @@
 #ifndef THREAD_PRIORITY_H
 #define THREAD_PRIORITY_H
 
-#include  "rtos_tcb.h"
+#include  "rtos_tcb_live.h"
 //#include  "arch_basetype.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-//TCB_t * pxCurrentTCB = NULL;
+//TCB_t * getCurrentTCB() = NULL;
 // {{{ Thread_Priority on currentThreadContext  {{{
 extern  UBaseType_t xGetThreadContextPriority(void);
 extern  UBaseType_t xSetThreadContextPriority(UBaseType_t  newLevel);
@@ -89,11 +89,11 @@ extern  UBaseType_t xDropThreadContextPriority(UBaseType_t  newLevel);
     // change Thread_Priority to blocked/suspended liveThread has no impact to
     //  RTOS to scheduling.
 
-extern  UBaseType_t xGetLiveThreadPriority(BaseTCB_t * pLiveThread);
-extern  UBaseType_t xSetLiveThreadPriority(BaseTCB_t * pLiveThread, UBaseType_t newLevel);
-extern  UBaseType_t xRaiseLiveThreadPriority(BaseTCB_t * pLiveThread, UBaseType_t newLevel);
+extern  UBaseType_t xGetLiveThreadPriority(LiveTCB_t * pLiveThread);
+extern  UBaseType_t xSetLiveThreadPriority(LiveTCB_t * pLiveThread, UBaseType_t newLevel);
+extern  UBaseType_t xRaiseLiveThreadPriority(LiveTCB_t * pLiveThread, UBaseType_t newLevel);
 
-extern  UBaseType_t xDropLiveThreadPriority(BaseTCB_t * pLiveThread, UBaseType_t newLevel);
+extern  UBaseType_t xDropLiveThreadPriority(LiveTCB_t * pLiveThread, UBaseType_t newLevel);
 // }}}  Thread_Priority for running Job/Thread  }}}
 
 #define     TEST_ThreadPriority     1

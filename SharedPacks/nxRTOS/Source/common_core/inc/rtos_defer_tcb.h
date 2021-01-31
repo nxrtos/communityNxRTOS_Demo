@@ -24,7 +24,7 @@
 
 /*-----------------------------------------------------------------------------
  * DeferTCB is similar to DeferJCB in the management , but the all items
- * for deferring Management is build into BaseTCB_t structure rather than
+ * for deferring Management is build into LiveTCB_t structure rather than
  * DeferJCB through seperated SoftTimer_ControlBlock binding with JCB.
  *
  * There are pxOsCurrentDeferTCBWaitingList and
@@ -40,7 +40,7 @@
 #ifndef     RTOS_DEFER_TCB_H
 #define    RTOS_DEFER_TCB_H
 
-#include    "rtos_tcb.h"
+#include    "rtos_tcb_live.h"
 
 extern  volatile R2BTCB_t * pxDeferTCBCurrentWaitingList;   // = NULL;
 extern  volatile R2BTCB_t * pxDeferTCBOverflowWaitingList;  // = NULL;

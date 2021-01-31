@@ -68,7 +68,7 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
   rtos_start_kernel();
-  // nerver return
+  // should never return
   return 0;
 }
 

@@ -43,12 +43,24 @@ typedef  enum   _xcb_state_enum
     JCB_STATE_DEL,      // termination
     JCB_STATE_END,
 
+    // LongLive Thread
     TCB_RUNNING,
     TCB_WAITINGSEMA,    // may with timer, check separated pointer to softTimer
     TCB_WAITINGMUTEX,   // may with timer, check separated pointer to softTimer
     TCB_DEFERRING,      // simply wait timer
     TCB_TERMINATING,    //
+    // ShortLive Thread
+    TCB_RUN2TERM,
 } XCB_State_t;
+
+typedef  enum   _mutex_state_enum
+{
+  MUTEX_FREE,
+  MUTEX_AVAILABLE,
+  MUTEX_ASSIGNED,
+  MUTEX_LOCKED,
+  MUTEX_END,
+} Mutex_State_t;
 
 typedef struct thread_control_block_t  TCB_t;
 
@@ -57,12 +69,32 @@ typedef struct _jcb_list_st
   struct  job_control_t   * next, * prev;
 }ListJCBItem_t;
 
+struct  thread_control_block_t;
+
+typedef struct _basetcb_list_st
+{
+  struct  thread_control_block_base_t   * next, * prev;
+}ListBTCBItem_t;
+
+typedef struct _tcb_list_st
+{
+  struct  thread_control_block_t   * next, * prev;
+}ListTCBItem_t;
+
+struct  _mutex_struct;
+typedef struct _mutex_list_st
+{
+  struct  _mutex_struct   * next, * prev;
+}ListMutexItem_t;
+
 typedef enum stack_autoalloc_type_enum
 {  // special number chosen never to be valid address for stack pointer
    StackLongPreserving = (-1),    // for Longlive_Thread
    StackShortPreserving = 1L      // for Shortlive_Thread
 } StackAllocType_t;
 
+struct  _semaphore_struct;
+struct  _mutex_struct;
 
 #define     Xcb_Base_Items                  \
     union                                   \
@@ -72,17 +104,24 @@ typedef enum stack_autoalloc_type_enum
         TCB_t       *   pTCB;   /*for JCB held running Job*/\
         StackAllocType_t  stackspace_type;  \
         /* for JCB ask for auto allocation of stackspace */ \
+        struct  _semaphore_struct * pNextSema;    /* point to next Sema in freeSemList*/\
+        struct  _mutex_struct * pNextMutex;  \
     };                                      \
     union                                   \
     {                                       \
         ListXItem_t   baseList;             \
+        ListBTCBItem_t xBTcbListItem;       \
         ListJCBItem_t xJcbListItem;         \
+        ListTCBItem_t xTcbListItem;         \
+        ListMutexItem_t xMutexListItem;     \
     };                                      \
     union                                   \
     {                                       \
         XCB_State_t   state_XCB;    /* state to cover JCB_state and TCB_state*/\
         XCB_State_t   stateOfJcb;   /* state to cover JCB_state */ \
-    }                                       \
+        XCB_State_t   stateOfTcb;   /* state to cover TCB_state */ \
+        Mutex_State_t stateOfMutex; /* state to cover TCB_state */ \
+    }
 
 typedef struct job_thread_control_block_t
 {

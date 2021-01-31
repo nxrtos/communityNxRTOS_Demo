@@ -21,6 +21,27 @@
  *
  * 1 tab == 4 spaces!
  */
+#include  "arch4rtos.h"
+#include  "nxRTOSConfig.h"
+
+void  arch4rtos_thread_termination(void * theTCB)
+{
+  (void) theTCB;  // expect in R0
+  //__asm volatile("    \n");
+  // this is no need but for debug trace hardfault in SVC_FF
+  //__NVIC_SetPriority(SVCall_IRQn, RTOS_SVC_ENTRY_PRIORITY);
+  __NVIC_SetPriority(SVCall_IRQn, 0); // to highest
+
+  __asm volatile
+  (
+    "  svc    #0xFF   \n"  // SVC_FF_handler()
+  );
+  __DSB();
+  __ISB();
+  while(1);
+}
+
+
 // removing
 #if 0
 

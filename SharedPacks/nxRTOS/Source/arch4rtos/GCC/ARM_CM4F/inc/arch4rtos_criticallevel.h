@@ -15,6 +15,7 @@
 
 #define  TEST_SysCriticalLevel        01
 
+#include  "arch4rtos_global_irq_control.h"
 #include  "arch_basetype.h"
 #include  "CMSIS_Device.h"
 

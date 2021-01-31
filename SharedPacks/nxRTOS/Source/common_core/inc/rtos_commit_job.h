@@ -75,14 +75,8 @@ JCB_t * rtos_commit_mutexjob(JCB_t * pxJCB, int iJobPar, void * pxJobData,
                         StackType_t * pThreadStack, int iStackSize,
                         JobHandlerEntry * pJobHandler, uint32_t xJobPriority,
                         JCB_ActOption_t autoAct, Mutex_t * pMutex4Job);
-
+// for rtos_commit_semjob(...) see
 #include  "rtos_semaphore.h"
-extern
-JCB_t * rtos_commit_semjob(JCB_t * pxJCB, int iJobPar, void * pxJobData,
-                        StackType_t * pThreadStack, int iStackSize,
-                        JobHandlerEntry * pJobHandler, uint32_t xJobPriority,
-                        JCB_ActOption_t autoAct, Sem_t *  pSem4Job);
-
 /// }}} rtos_commit_job }}}
 
 #endif

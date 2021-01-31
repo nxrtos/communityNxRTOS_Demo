@@ -25,7 +25,7 @@
 
 /*-----------------------------------------------------------------------------
  * pickTCB() will try to find and return the Thread with highest priority
- * at the moment in the RTOS system, update it to pxCurrentTCB.
+ * at the moment in the RTOS system, update it to getCurrentTCB().
  * it look between readyJobList, readyThreadList to find the
  * highest priority of Thread to serve to.
  * for performance concern,  a 2-wayLinkList for each prioritizedReadyJobList
@@ -37,8 +37,8 @@
 #ifndef	PICK_TCB_H
 #define PICK_TCB_H
 
-#include "rtos_tcb.h"
+#include "rtos_tcb_live.h"
 
-BaseTCB_t * pickTCB(BaseTCB_t * thisTCB);
+LiveTCB_t * pickTCB(LiveTCB_t * thisTCB);
 
 #endif
